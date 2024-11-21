@@ -47,7 +47,10 @@ class MainViewController: UIViewController {
         flowLayout?.estimatedItemSize = UICollectionViewFlowLayout.automaticSize
         searchHistoryCollectionView.register(UINib(nibName: SearchHistoryCollectionViewCell.identifier, bundle: nil), forCellWithReuseIdentifier: SearchHistoryCollectionViewCell.identifier)
         searchHistoryCollectionView.dataSource = self
-        
+        // Обращаемся к свойству 'delegate' у 'searchHistoryCollectionView' и присваеваем обьект текущего класса, а именно экземпляр класса MainViewController. Иными словами, перенимаем ответственность, которая находится в протоколе UICollectionViewDelegate. Делается это с целью получения обратной связи, в нашем случае для обнаружения выбора ячейки.
+        searchHistoryCollectionView.delegate = self
+
+        // Теперь для переопределения значения свойства 'searchTextArray' вызываем метод resetSearchTextArray
         resetSearchHistory()
     }
     
@@ -148,11 +151,7 @@ class MainViewController: UIViewController {
     
     func save(searchText: String){
         var existingArr: [String] = getSearchTextArr()
-        if existingArr.contains(searchText){
-            return
-        }else{
-            existingArr.append(searchText)
-        }
+        existingArr.append(searchText)
         UserDefaults.standard.set(existingArr, forKey: savedSearchHistoryArrayKey)
         
         resetSearchHistory()
@@ -173,13 +172,35 @@ class MainViewController: UIViewController {
     }
     
     func getSortedSearchArray() -> [String]{
-        var savedSearchHistoryArr:[String] = getSearchTextArr()
-        var reversedArray: [String] = savedSearchHistoryArr.reversed()
+        let  savedSearchHistoryArr:[String] = getSearchTextArr()
+        let  reversedArray: [String] = savedSearchHistoryArr.reversed()
         return reversedArray
     }
     
+    // Новый метод, который переопределеяет значение свойства 'searchTextArray' путем присваения полученного значения метода getSortedSearchTextArray()
     func resetSearchHistory() {
-        self.searchTextArray = getSortedSearchArray()
+        // Теперь вместо значения метода getSortedSearchTextArray() присваевается значение другого метода getUniqueSearchTextArray()
+        self.searchTextArray = getUniqueSearchTextArray()
+    }
+    func getUniqueSearchTextArray() -> [String] {
+        
+        // Создается константа и устанавливается начальное значение, где присваевается возвращаемое значение методом getSortedSearchTextArray()
+        let sortedSearchTextArray: [String] = getSortedSearchArray()
+        
+        // Создается пустая переменная для хранения уникальных текстовых запросов
+        var sortedSearchTextArrayWithUniqueValues: [String] = []
+        
+        // Идет итерация по каждомоу элементу массива 'sortedSearchTextArray'
+        sortedSearchTextArray.forEach { searchText in
+            
+            // Идет проверка на отсутствия элемента в массиве 'sortedSearchTextArrayWithUniqueValues'
+            // Метод 'contains' возвращает TRUE если 'searchText' уже содержится в массиве 'sortedSearchTextArrayWithUniqueValues'
+            if !sortedSearchTextArrayWithUniqueValues.contains(searchText) {
+                sortedSearchTextArrayWithUniqueValues.append(searchText)
+            }
+        }
+        // Возвращает массив с уникальныеми текстами
+        return sortedSearchTextArrayWithUniqueValues
     }
 
 
@@ -255,10 +276,24 @@ extension MainViewController: UICollectionViewDelegateFlowLayout{
     }
     
     func collectionView(_ collectionView: UICollectionView, didSelectItemAt indexPath: IndexPath) {
-        let photo = self.photos[indexPath.item]
-        let url = photo.src.large2X
-        
-        let vc = ImageScrollViewController(imageUrl: url)
-        self.navigationController?.pushViewController(vc, animated: true)
+        // Теперь отделяем обработку выбора ячейки для соответвующего обьекта UICollectionView, а именно параметра 'collectionView'
+        switch collectionView{
+        case imageCollectionView:
+            let photo = self.photos[indexPath.item]
+            let url = photo.src.large2X
+            
+            let vc = ImageScrollViewController(imageUrl: url)
+            self.navigationController?.pushViewController(vc, animated: true)
+        case searchHistoryCollectionView:
+            // Извлекаем текст из массива 'searchTextArray' c соответсвтующим индексом
+            let searchText: String = searchTextArray[indexPath.item]
+            // Для свойства 'text' у 'searchBar' присваеваем ранее извлеченный текст
+            searchBar.text = searchText
+            // Вызываем метод search(), который отправляет запрос для поиска изображений по тексту в поисковой панели
+            search()
+            
+        default:
+            ()
+        }
     }
 }

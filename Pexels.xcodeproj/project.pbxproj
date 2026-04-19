@@ -27,6 +27,7 @@
 		BFC60D4B2C35C04400F94B0B /* ImageScrollViewController.xib in Resources */ = {isa = PBXBuildFile; fileRef = BFC60D492C35C04400F94B0B /* ImageScrollViewController.xib */; };
 		BFC60D4E2C38175500F94B0B /* SearchHistoryCollectionViewCell.swift in Sources */ = {isa = PBXBuildFile; fileRef = BFC60D4C2C38175500F94B0B /* SearchHistoryCollectionViewCell.swift */; };
 		BFC60D4F2C38175500F94B0B /* SearchHistoryCollectionViewCell.xib in Resources */ = {isa = PBXBuildFile; fileRef = BFC60D4D2C38175500F94B0B /* SearchHistoryCollectionViewCell.xib */; };
+		BFDD85412F82E2D9001CABEB /* PexelsModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = BFDD85402F82E2D9001CABEB /* PexelsModels.swift */; };
 		BFFC380F2C1E295A00300D62 /* SearchPhotosResponse.swift in Sources */ = {isa = PBXBuildFile; fileRef = BFFC380E2C1E295A00300D62 /* SearchPhotosResponse.swift */; };
 /* End PBXBuildFile section */
 
@@ -72,6 +73,7 @@
 		BFC60D492C35C04400F94B0B /* ImageScrollViewController.xib */ = {isa = PBXFileReference; lastKnownFileType = file.xib; path = ImageScrollViewController.xib; sourceTree = "<group>"; };
 		BFC60D4C2C38175500F94B0B /* SearchHistoryCollectionViewCell.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SearchHistoryCollectionViewCell.swift; sourceTree = "<group>"; };
 		BFC60D4D2C38175500F94B0B /* SearchHistoryCollectionViewCell.xib */ = {isa = PBXFileReference; lastKnownFileType = file.xib; path = SearchHistoryCollectionViewCell.xib; sourceTree = "<group>"; };
+		BFDD85402F82E2D9001CABEB /* PexelsModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PexelsModels.swift; sourceTree = "<group>"; };
 		BFFC380E2C1E295A00300D62 /* SearchPhotosResponse.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SearchPhotosResponse.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
@@ -142,6 +144,7 @@
 				BFC60D492C35C04400F94B0B /* ImageScrollViewController.xib */,
 				BFC60D4C2C38175500F94B0B /* SearchHistoryCollectionViewCell.swift */,
 				BFC60D4D2C38175500F94B0B /* SearchHistoryCollectionViewCell.xib */,
+				BFDD85402F82E2D9001CABEB /* PexelsModels.swift */,
 			);
 			path = Pexels;
 			sourceTree = "<group>";
@@ -302,6 +305,7 @@
 				BF853B262C0472970015E1C9 /* AppDelegate.swift in Sources */,
 				BF31705E2C2F1C2F004B6D1D /* PhotoCollectionViewCell.swift in Sources */,
 				BFC60D4A2C35C04400F94B0B /* ImageScrollViewController.swift in Sources */,
+				BFDD85412F82E2D9001CABEB /* PexelsModels.swift in Sources */,
 				BF853B5E2C04C1A80015E1C9 /* OnboardingModel.swift in Sources */,
 				BF853B572C0472F80015E1C9 /* OnboardingViewController.swift in Sources */,
 				BFC60D4E2C38175500F94B0B /* SearchHistoryCollectionViewCell.swift in Sources */,

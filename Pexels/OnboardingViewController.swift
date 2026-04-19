@@ -37,9 +37,25 @@ class OnboardingViewController: UIViewController {
     }
     
     func generatePages(){
-        pages = [OnboardingModel(imageName: "onboarding1", title: "Добро пожаловать в Pexels!", subtitle: "Исследуйте миллионы красивых фотографий под любое слово. Наше приложение помогает вам найти и сохранить вдохновение."),
-        OnboardingModel(imageName: "onboarding2", title: "Легкий поиск фотографий", subtitle: "Введите любое слово в поисковую строку и найдите тысячи фотографий по вашей теме. Мы обеспечиваем быстрый и точный поиск."),
-        OnboardingModel(imageName: "onboarding3", title: "Сохраняйте и делитесь", subtitle: "Сохраняйте ваши поисковые запросы и добавляйте понравившиеся фотографии в избранное. Легко возвращайтесь к ним в любое время и делитесь с друзьями.")]
+        pages = [
+            OnboardingModel(
+                imageName: "onboarding1",
+                title: "Welcome to Pexels!",
+                subtitle: "Explore millions of beautiful photos for any keyword. Our app helps you discover and save inspiration."
+            ),
+            
+            OnboardingModel(
+                imageName: "onboarding2",
+                title: "Easy Photo Search",
+                subtitle: "Enter any keyword in the search bar and find thousands of photos related to your topic. We provide fast and accurate search."
+            ),
+            
+            OnboardingModel(
+                imageName: "onboarding3",
+                title: "Save and Share",
+                subtitle: "Save your searches and add your favorite photos to bookmarks. Easily return to them anytime and share with friends."
+            )
+        ]
     }
     @IBAction func skipButtonClicked(_ sender: UIButton) {
         start()
@@ -67,10 +83,10 @@ class OnboardingViewController: UIViewController {
     func handlePageChanges(){
         if pageControll.currentPage == pageControll.numberOfPages - 1{
             skipButton.isHidden = true
-            nextButton.setTitle("Начать", for: .normal)
+            nextButton.setTitle("Start", for: .normal)
         }else{
             skipButton.isHidden = false
-            nextButton.setTitle("Дальше", for: .normal)
+            nextButton.setTitle("Next", for: .normal)
         }
     }
 }

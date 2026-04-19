@@ -7,21 +7,42 @@
 
 import UIKit
 
+class LoadingFooterView: UICollectionReusableView {
+    static let identifier = "LoadingFooterView"
+    let spinner = UIActivityIndicatorView(style: .medium)
+
+    override init(frame: CGRect) {
+        super.init(frame: frame)
+        spinner.translatesAutoresizingMaskIntoConstraints = false
+        addSubview(spinner)
+        NSLayoutConstraint.activate([
+            spinner.centerXAnchor.constraint(equalTo: centerXAnchor),
+            spinner.centerYAnchor.constraint(equalTo: centerYAnchor)
+        ])
+    }
+
+    required init?(coder: NSCoder) {
+        fatalError("init(coder:) has not been implemented")
+    }
+}
+
 class MainViewController: UIViewController {
 
     @IBOutlet var searchBar: UISearchBar!
     @IBOutlet var searchHistoryCollectionView: UICollectionView!
     @IBOutlet var imageCollectionView: UICollectionView!
     
-    var searchPhotosResponse: SearchPhotosResponse?{
-        didSet{
+    // MARK: - НОВЫЕ ПЕРЕМЕННЫЕ ДЛЯ ПАГИНАЦИИ
+    var currentPage = 1
+    var isFetchingMore = false
+    
+    // Теперь это массив, к которому мы сможем добавлять новые фотки
+    var photos: [Photo] = [] {
+        didSet {
             DispatchQueue.main.async {
                 self.imageCollectionView.reloadData()
             }
         }
-    }
-    var photos: [Photo]{
-        return searchPhotosResponse?.photos ?? []
     }
     
     let savedSearchHistoryArrayKey: String = "savedSearchHistoryArrayKey"
@@ -39,127 +60,140 @@ class MainViewController: UIViewController {
         imageCollectionView.register(UINib(nibName: PhotoCollectionViewCell.identifier, bundle: nil), forCellWithReuseIdentifier: PhotoCollectionViewCell.identifier)
         imageCollectionView.dataSource = self
         imageCollectionView.delegate = self
+        
+        // Настройка Pull-to-Refresh
         imageCollectionView.refreshControl = UIRefreshControl()
         imageCollectionView.refreshControl?.addTarget(self, action: #selector(search), for: .valueChanged)
         
-        //SearchHistory SetUp
+        // SearchHistory SetUp
         let flowLayout = searchHistoryCollectionView.collectionViewLayout as? UICollectionViewFlowLayout
         flowLayout?.estimatedItemSize = UICollectionViewFlowLayout.automaticSize
         searchHistoryCollectionView.register(UINib(nibName: SearchHistoryCollectionViewCell.identifier, bundle: nil), forCellWithReuseIdentifier: SearchHistoryCollectionViewCell.identifier)
         searchHistoryCollectionView.dataSource = self
-        // Обращаемся к свойству 'delegate' у 'searchHistoryCollectionView' и присваеваем обьект текущего класса, а именно экземпляр класса MainViewController. Иными словами, перенимаем ответственность, которая находится в протоколе UICollectionViewDelegate. Делается это с целью получения обратной связи, в нашем случае для обнаружения выбора ячейки.
         searchHistoryCollectionView.delegate = self
 
-        // Теперь для переопределения значения свойства 'searchTextArray' вызываем метод resetSearchTextArray
+        imageCollectionView.register(LoadingFooterView.self,
+            forSupplementaryViewOfKind: UICollectionView.elementKindSectionFooter,
+            withReuseIdentifier: LoadingFooterView.identifier)
         resetSearchHistory()
     }
     
     
-    @objc
-    func search(){
-        self.searchPhotosResponse = nil
+    // MARK: - НОВАЯ ЛОГИКА ЗАГРУЗКИ (Обновление и Пагинация)
+    
+    @objc func search() {
+        // При новом поиске или свайпе вниз сбрасываем всё до 1 страницы
+        currentPage = 1
+        isFetchingMore = false
         
-        guard let searchText = searchBar.text else{
-            print("Search Bar text is nil")
+        guard let searchText = searchBar.text, !searchText.isEmpty else {
+            imageCollectionView.refreshControl?.endRefreshing()
             return
         }
-        guard !searchText.isEmpty else{
-            print("Search bar text is empty")
-            return
-        }
-        
-        //Save Searching text
         
         save(searchText: searchText)
+        fetchPhotos(isRefresh: true)
+    }
+    
+    func loadMorePhotos() {
+        // Если уже грузим или текст пустой - отменяем
+        guard !isFetchingMore, let searchText = searchBar.text, !searchText.isEmpty else { return }
+        isFetchingMore = true
+
+        // Обновляем макет, чтобы появился футер
+        DispatchQueue.main.async {
+            self.imageCollectionView.collectionViewLayout.invalidateLayout()
+        }
+
+        currentPage += 1
+        fetchPhotos(isRefresh: false)
+    }
+    
+    
+    func fetchPhotos(isRefresh: Bool) {
+        guard let searchText = searchBar.text else { return }
         
-        
-        let endpoint: String = "https://api.pexels.com/v1/search"
-        guard var urlComponent = URLComponents(string: endpoint) else{
-            print("Couldn't create URLComponents instance from endpoint - \(endpoint)")
-            return
+        if isRefresh {
+            if imageCollectionView.refreshControl?.isRefreshing == false {
+                imageCollectionView.refreshControl?.beginRefreshing()
+            }
         }
         
-        //Создать и вложить параметры для поиска изображения
+        let endpoint = "https://api.pexels.com/v1/search"
+        guard var urlComponent = URLComponents(string: endpoint) else { return }
+        
+        // Добавили параметр "page" и изменили "per-page" на "per_page" (как требует Pexels API)
         let parameters = [
             URLQueryItem(name: "query", value: searchText),
-            URLQueryItem(name: "per-page", value: "80")
+            URLQueryItem(name: "per_page", value: "30"), // Грузим по 30 штук за раз
+            URLQueryItem(name: "page", value: "\(currentPage)") // Номер страницы
         ]
         urlComponent.queryItems = parameters
         
-        guard let url: URL = urlComponent.url else{
-            print("URL is nil")
-            return
-        }
+        guard let url = urlComponent.url else { return }
         
-        
-        var urlRequest: URLRequest = URLRequest(url: url)
+        var urlRequest = URLRequest(url: url)
         urlRequest.httpMethod = "GET"
         
-        //MARK: - Код для использование другие http методы (POST,DELETE итд)
-        //        urlRequest.httpMethod = "GET"
-//        let parameters: [String: Any] = [
-//            "query": searchText,
-//            "per-page": "10"
-//        ]
-//        urlRequest.httpBody = try? JSONSerialization.data(withJSONObject: parameters)
-
-        
-        let APIKey: String = "as3X1H4LC7yevkXt2PCKDSWBSMx1k8WZosuH0aEo9PsJM1qxh9ZoPRl6"
+        let APIKey = "as3X1H4LC7yevkXt2PCKDSWBSMx1k8WZosuH0aEo9PsJM1qxh9ZoPRl6"
         urlRequest.addValue(APIKey, forHTTPHeaderField: "Authorization")
         
-        if imageCollectionView.refreshControl?.isRefreshing == false{
-            imageCollectionView.refreshControl?.beginRefreshing()
+        let urlSession = URLSession(configuration: .default)
+        let dataTask = urlSession.dataTask(with: urlRequest) { [weak self] data, response, error in
+            guard let self = self else { return }
+            
+            // Выключаем крутилки загрузки
+            DispatchQueue.main.async {
+                if isRefresh {
+                    self.imageCollectionView.refreshControl?.endRefreshing()
+                }
+            }
+            
+            if let error = error {
+                print("Error - \(error.localizedDescription)")
+                self.isFetchingMore = false
+                return
+            }
+            
+            if let data = data {
+                do {
+                    let searchPhotosResponse = try JSONDecoder().decode(SearchPhotosResponse.self, from: data)
+                    
+                    DispatchQueue.main.async {
+                        if isRefresh {
+                            // Если это новый поиск или свайп сверху - перезаписываем массив
+                            self.photos = searchPhotosResponse.photos
+                        } else {
+                            // Если это скролл вниз - добавляем новые фотки к старым
+                            self.photos.append(contentsOf: searchPhotosResponse.photos)
+                        }
+                        self.isFetchingMore = false // Снимаем блок
+                    }
+                } catch {
+                    print("Serialization error - \(error.localizedDescription)")
+                    self.isFetchingMore = false
+                }
+            }
         }
-        
-        let urlSession: URLSession = URLSession(configuration: .default)
-        let dataTask: URLSessionDataTask = urlSession.dataTask(with: urlRequest, completionHandler: searchPhotosHandler(data:urlResponse:error:))
+        // Когда данные загружены или произошла ошибка
+        self.isFetchingMore = false
+        self.imageCollectionView.collectionViewLayout.invalidateLayout() // Футер скроется
+        self.imageCollectionView.reloadData()
         
         dataTask.resume()
-        
     }
-    func searchPhotosHandler(data: Data?,urlResponse: URLResponse?, error: Error?){
-        print("Method searchPhotosHandler was called")
-        
-        DispatchQueue.main.async{
-            if self.imageCollectionView.refreshControl?.isRefreshing == true {
-                self.imageCollectionView.refreshControl?.endRefreshing()
-            }
-        }
-        
-        
-        
-        if let error = error {
-            print("Search photos endpoint error - \(error.localizedDescription)")
-        }else if let data = data{
-            do{
-//                let jsonObject = try JSONSerialization.jsonObject(with: data)
-//                print("Search photos endpoint jsonObject - \(jsonObject)")
-                    
-                let searchPhotosResponse = try JSONDecoder().decode(SearchPhotosResponse.self,from: data)
-                print("Search photos endpoint response - \(searchPhotosResponse)")
-                self.searchPhotosResponse = searchPhotosResponse
-            }catch let error{
-                print("Search photos endpoint serialization error - \(error.localizedDescription)")
-            }
-        }
-        
-        if let urlResponse = urlResponse, let httpResponse = urlResponse as? HTTPURLResponse{
-            print("Search photos endpoint http respons - \(httpResponse.statusCode)")
-        }
-        
-    }
+    
+    // MARK: - ИСТОРИЯ ПОИСКА
     
     func save(searchText: String){
         var existingArr: [String] = getSearchTextArr()
         existingArr.append(searchText)
         UserDefaults.standard.set(existingArr, forKey: savedSearchHistoryArrayKey)
-        
         resetSearchHistory()
     }
     
     func getSearchTextArr() -> [String]{
-        let array: [String] = UserDefaults.standard.stringArray(forKey: savedSearchHistoryArrayKey) ?? []
-        return array
+        return UserDefaults.standard.stringArray(forKey: savedSearchHistoryArrayKey) ?? []
     }
     
     @IBAction func clearAllTextHistory(_ sender: UIButton) {
@@ -172,65 +206,43 @@ class MainViewController: UIViewController {
     }
     
     func getSortedSearchArray() -> [String]{
-        let  savedSearchHistoryArr:[String] = getSearchTextArr()
-        let  reversedArray: [String] = savedSearchHistoryArr.reversed()
-        return reversedArray
+        return getSearchTextArr().reversed()
     }
     
-    // Новый метод, который переопределеяет значение свойства 'searchTextArray' путем присваения полученного значения метода getSortedSearchTextArray()
     func resetSearchHistory() {
-        // Теперь вместо значения метода getSortedSearchTextArray() присваевается значение другого метода getUniqueSearchTextArray()
         self.searchTextArray = getUniqueSearchTextArray()
     }
+    
     func getUniqueSearchTextArray() -> [String] {
-        
-        // Создается константа и устанавливается начальное значение, где присваевается возвращаемое значение методом getSortedSearchTextArray()
-        let sortedSearchTextArray: [String] = getSortedSearchArray()
-        
-        // Создается пустая переменная для хранения уникальных текстовых запросов
-        var sortedSearchTextArrayWithUniqueValues: [String] = []
-        
-        // Идет итерация по каждомоу элементу массива 'sortedSearchTextArray'
+        let sortedSearchTextArray = getSortedSearchArray()
+        var uniqueArr: [String] = []
         sortedSearchTextArray.forEach { searchText in
-            
-            // Идет проверка на отсутствия элемента в массиве 'sortedSearchTextArrayWithUniqueValues'
-            // Метод 'contains' возвращает TRUE если 'searchText' уже содержится в массиве 'sortedSearchTextArrayWithUniqueValues'
-            if !sortedSearchTextArrayWithUniqueValues.contains(searchText) {
-                sortedSearchTextArrayWithUniqueValues.append(searchText)
+            if !uniqueArr.contains(searchText) {
+                uniqueArr.append(searchText)
             }
         }
-        // Возвращает массив с уникальныеми текстами
-        return sortedSearchTextArrayWithUniqueValues
+        return uniqueArr
     }
-
-
 }
 
-
-
+// MARK: - UISearchBarDelegate
 extension MainViewController: UISearchBarDelegate{
     func searchBarTextDidBeginEditing(_ searchBar: UISearchBar) {
-        searchBar.showsCancelButton = true //Кнопка "Отменить" должна отображатся после начала редактирование текста
-
+        searchBar.showsCancelButton = true
     }
     func searchBarCancelButtonClicked(_ searchBar: UISearchBar) {
-        searchBar.resignFirstResponder() // Чтобы клавиатура скрылся после нажатии на кнопку Отменить
+        searchBar.resignFirstResponder()
     }
     func searchBarTextDidEndEditing(_ searchBar: UISearchBar) {
-        searchBar.showsCancelButton = false // Кнопка Отменить должен скрываться после окончании редактировании текста
+        searchBar.showsCancelButton = false
     }
     func searchBarSearchButtonClicked(_ searchBar: UISearchBar) {
-        searchBar.resignFirstResponder() //Клавиатура должна скрываться после нажатии на кнопку search
+        searchBar.resignFirstResponder()
         search()
     }
 }
 
-
-
-
-
-
-
+// MARK: - UICollectionViewDataSource
 extension MainViewController: UICollectionViewDataSource{
     func collectionView(_ collectionView: UICollectionView, numberOfItemsInSection section: Int) -> Int {
         switch collectionView {
@@ -247,7 +259,6 @@ extension MainViewController: UICollectionViewDataSource{
     }
     
     func collectionView(_ collectionView: UICollectionView, cellForItemAt indexPath: IndexPath) -> UICollectionViewCell {
-        
         switch collectionView{
         case imageCollectionView:
             let cell = collectionView.dequeueReusableCell(withReuseIdentifier: PhotoCollectionViewCell.identifier, for: indexPath) as! PhotoCollectionViewCell
@@ -262,21 +273,49 @@ extension MainViewController: UICollectionViewDataSource{
             return UICollectionViewCell()
         }
     }
+    
+    func collectionView(_ collectionView: UICollectionView, viewForSupplementaryElementOfKind kind: String, at indexPath: IndexPath) -> UICollectionReusableView {
+        if kind == UICollectionView.elementKindSectionFooter && collectionView == imageCollectionView {
+            let footer = collectionView.dequeueReusableSupplementaryView(ofKind: kind, withReuseIdentifier: LoadingFooterView.identifier, for: indexPath) as! LoadingFooterView
+            return footer
+        }
+        return UICollectionReusableView()
+    }
 }
 
-extension MainViewController: UICollectionViewDelegateFlowLayout{
+// MARK: - UICollectionViewDelegateFlowLayout & Delegate
+extension MainViewController: UICollectionViewDelegateFlowLayout {
     func collectionView(_ collectionView: UICollectionView, layout collectionViewLayout: UICollectionViewLayout, sizeForItemAt indexPath: IndexPath) -> CGSize {
+            
+            // 1. ИСПРАВЛЕНИЕ: Возвращаем безопасный размер заглушку для истории поиска.
+            // Реальная ширина посчитается сама на основе текста внутри ячейки.
+            if collectionView == searchHistoryCollectionView {
+                return CGSize(width: 100, height: 40)
+            }
+            
+            // 2. Расчет для сетки с картинками
+            let flowLayout = collectionViewLayout as? UICollectionViewFlowLayout
+            let horizontalSpacing = (flowLayout?.minimumInteritemSpacing ?? 0) + collectionView.contentInset.left + collectionView.contentInset.right
+            
+            // 3. Защита от отрицательной ширины (на всякий случай)
+            let safeWidth = max(0, collectionView.frame.width - horizontalSpacing)
+            let width = safeWidth / 2
+            
         
-        let flowLayout: UICollectionViewFlowLayout? = collectionViewLayout as? UICollectionViewFlowLayout
-        let horizontalSpacing: CGFloat = (flowLayout?.minimumInteritemSpacing ?? 0) + collectionView.contentInset.left + collectionView.contentInset.right
-        let width: CGFloat = ( collectionView.frame.width - horizontalSpacing ) / 2
-        let height: CGFloat = width
-        
-        return CGSize(width: width, height: height)
+            return CGSize(width: width, height: width)
+        }
+    
+    func collectionView(_ collectionView: UICollectionView, layout collectionViewLayout: UICollectionViewLayout, referenceSizeForFooterInSection section: Int) -> CGSize {
+        // Если сейчас идет загрузка и это основная коллекция — показываем футер высотой 50
+        if isFetchingMore && collectionView == imageCollectionView {
+            return CGSize(width: collectionView.frame.width, height: 50)
+        }
+        return .zero
     }
     
+    
+    
     func collectionView(_ collectionView: UICollectionView, didSelectItemAt indexPath: IndexPath) {
-        // Теперь отделяем обработку выбора ячейки для соответвующего обьекта UICollectionView, а именно параметра 'collectionView'
         switch collectionView{
         case imageCollectionView:
             let photo = self.photos[indexPath.item]
@@ -285,15 +324,23 @@ extension MainViewController: UICollectionViewDelegateFlowLayout{
             let vc = ImageScrollViewController(imageUrl: url)
             self.navigationController?.pushViewController(vc, animated: true)
         case searchHistoryCollectionView:
-            // Извлекаем текст из массива 'searchTextArray' c соответсвтующим индексом
-            let searchText: String = searchTextArray[indexPath.item]
-            // Для свойства 'text' у 'searchBar' присваеваем ранее извлеченный текст
+            let searchText = searchTextArray[indexPath.item]
             searchBar.text = searchText
-            // Вызываем метод search(), который отправляет запрос для поиска изображений по тексту в поисковой панели
             search()
             
         default:
-            ()
+            break
+        }
+    }
+    
+    // MARK: - НОВОЕ: Отслеживаем скролл для пагинации
+    func collectionView(_ collectionView: UICollectionView, willDisplay cell: UICollectionViewCell, forItemAt indexPath: IndexPath) {
+        // Проверяем, что это коллекция с картинками, а не история поиска
+        if collectionView == imageCollectionView {
+            // Если показывается последняя картинка из массива
+            if indexPath.item == photos.count - 1 {
+                loadMorePhotos()
+            }
         }
     }
 }
